@@ -1,0 +1,488 @@
+<title>FBC Campus Wayfinder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: kiosk console. Status bar + live tiles on top, heads-up campus map (Lobby kiosk at bottom) on the left, destination console on the right. Deliberately single dark theme, like a lit kiosk screen. */
+:root{
+  color-scheme:dark;
+  --bg:#081113; --panel:#0e1b1e; --panel-2:#122326; --line:#1f3539; --fg:#e8f1ef; --muted:#87a09b;
+  --route:#ffb547; --here:#ff5d73; --lawn:#0e2219; --lawn-line:#14301f; --walk:#1d3236; --room:#132427; --room-stroke:#2c464b;
+  --c-office:#63a8ff; --c-dept:#c792ff; --c-class:#4fd1c5; --c-facility:#86dc7a; --c-pending:#6c7f7b;
+  --ok:#5fe0a0; --closed:#ff7b7b;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  color-scheme:light;
+  --bg:#f2f6f5; --panel:#ffffff; --panel-2:#eaf1ef; --line:#d5e0dc; --fg:#0f1f1c; --muted:#566b66;
+  --route:#e08600; --here:#e0364f; --lawn:#e2f0df; --lawn-line:#c9dfc5; --walk:#d3ddd9; --room:#ffffff; --room-stroke:#a7b9b3;
+  --c-office:#1f6fd1; --c-dept:#8448cf; --c-class:#0e978b; --c-facility:#3b962f; --c-pending:#8a9894;
+  --ok:#17955a; --closed:#d03a3a}}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f2f6f5; --panel:#ffffff; --panel-2:#eaf1ef; --line:#d5e0dc; --fg:#0f1f1c; --muted:#566b66;
+  --route:#e08600; --here:#e0364f; --lawn:#e2f0df; --lawn-line:#c9dfc5; --walk:#d3ddd9; --room:#ffffff; --room-stroke:#a7b9b3;
+  --c-office:#1f6fd1; --c-dept:#8448cf; --c-class:#0e978b; --c-facility:#3b962f; --c-pending:#8a9894;
+  --ok:#17955a; --closed:#d03a3a}
+.themebtn{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;padding:8px 12px;border-radius:99px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
+.themebtn:hover{border-color:var(--route)}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:16px;padding-block:16px;display:grid;gap:14px}
+.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:14px;min-width:0}
+.mono-badge{width:52px;height:52px;border-radius:10px;display:grid;place-items:center;background:var(--route);color:#1d1203;font-family:var(--display);font-weight:800;font-size:1.35rem;letter-spacing:.02em;flex:none}
+.brand h1{font-family:var(--display);font-weight:800;font-size:2.1rem;line-height:.95;margin:0;text-transform:uppercase;letter-spacing:.01em}
+.brand p{margin:3px 0 0;color:var(--muted);font-size:.85rem}
+.status{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.live{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 var(--ok);animation:ping 2s infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 60%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
+.clock{text-align:right}
+.clock b{display:block;font-family:var(--display);font-weight:800;font-size:2.2rem;line-height:1;font-variant-numeric:tabular-nums}
+.clock span{color:var(--muted);font-size:.85rem}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:760px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.kpi small{display:block;font-family:var(--mono);font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.kpi b{display:block;font-family:var(--display);font-weight:800;font-size:2rem;line-height:1.05;font-variant-numeric:tabular-nums;margin-top:2px}
+.kpi span{font-size:.82rem;color:var(--muted)}
+.grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:980px){.grid{grid-template-columns:1fr}}
+.mapcard{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;min-width:0}
+.mapcard svg{display:block;width:100%;height:auto}
+.maphead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 4px 8px}
+.maphead h2{margin:0;font-family:var(--display);font-weight:800;text-transform:uppercase;font-size:1.25rem;letter-spacing:.04em}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.78rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.room{cursor:pointer}
+.room rect.box{fill:var(--room);stroke:var(--room-stroke);stroke-width:3;transition:fill .2s}
+.room:hover rect.box,.room:focus-visible rect.box{fill:var(--panel-2)}
+.room:focus{outline:none}
+.room:focus-visible rect.box{stroke:var(--fg)}
+.room.dest rect.box{fill:color-mix(in srgb,var(--route) 26%,var(--room));stroke:var(--route);stroke-width:7}
+.room.from rect.box{stroke:var(--here);stroke-width:6}
+.room.dim{opacity:.35}
+.rl{font-family:var(--display);font-weight:800;fill:var(--fg);pointer-events:none;letter-spacing:.03em;text-transform:uppercase}
+.bl{font-family:var(--display);font-weight:600;fill:var(--muted);letter-spacing:.22em;text-transform:uppercase;font-size:30px}
+.side{display:grid;gap:12px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.searchrow{display:flex;gap:8px;align-items:center}
+.search{flex:1;min-width:0;padding:12px 14px;font-size:1.05rem;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font-family:var(--body)}
+.search::placeholder{color:var(--muted)}
+.lbl{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:12px 0 6px}
+.picks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pick{display:grid;gap:2px;text-align:left;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);color:var(--fg);font:inherit;cursor:pointer;transition:border-color .15s,transform .15s}
+.pick:hover{border-color:var(--route);transform:translateY(-1px)}
+.pick b{font-family:var(--display);font-weight:800;font-size:1.15rem;text-transform:uppercase;letter-spacing:.02em}
+.pick span{font-size:.75rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.result h3{margin:4px 0 0;font-family:var(--display);font-weight:800;font-size:2.2rem;line-height:1;text-transform:uppercase;text-wrap:balance}
+.chiprow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--fg)}
+.tag i{width:7px;height:7px;border-radius:50%}
+.eta{display:flex;gap:18px;margin:14px 0 10px;flex-wrap:wrap}
+.eta div b{display:block;font-family:var(--display);font-weight:800;font-size:2.4rem;line-height:1;color:var(--route);font-variant-numeric:tabular-nums}
+.eta div span{font-size:.8rem;color:var(--muted)}
+ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:0;counter-reset:s}
+ol.steps li{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:start;padding:9px 0;border-top:1px solid var(--line);counter-increment:s}
+ol.steps li::before{content:counter(s);width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--panel-2);border:1px solid var(--line);font-family:var(--mono);font-size:.75rem;color:var(--route)}
+ol.steps li:last-child::before{content:"★";background:var(--route);color:#1d1203;border-color:var(--route)}
+ol.steps em{font-style:normal;color:var(--muted);font-family:var(--mono);font-size:.8rem;font-variant-numeric:tabular-nums}
+.hint{color:var(--muted);margin:6px 0 0}
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.chip{font-size:.8rem;padding:5px 11px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer;font-family:var(--body)}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.dir{max-height:330px;overflow:auto;display:grid;gap:1px;padding-right:4px}
+.grp{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 4px 4px}
+.it{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:var(--fg);text-align:left;font:inherit;cursor:pointer}
+.it:hover{background:var(--panel-2)}
+.it[aria-current="true"]{background:var(--panel-2);box-shadow:inset 3px 0 0 var(--route)}
+.it span:nth-child(2){flex:1;min-width:0}
+.it small{display:block;color:var(--muted);font-size:.78rem}
+.it em{font-style:normal;font-family:var(--mono);font-size:.75rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.foot{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+.foot a{color:var(--fg)}
+.foot b{color:var(--fg)}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid var(--route);outline-offset:2px}
+.start{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--muted)}
+.start select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit}
+#routeGlow{fill:none;stroke:var(--route);stroke-opacity:.22;stroke-width:34;stroke-linecap:round;stroke-linejoin:round}
+#routeLine{fill:none;stroke:var(--route);stroke-width:12;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:26 18;animation:march .9s linear infinite}
+@keyframes march{to{stroke-dashoffset:-44}}
+.pulse{animation:pulse 1.6s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pulse{0%{transform:scale(.6);opacity:.9}100%{transform:scale(2.4);opacity:0}}
+@media (prefers-reduced-motion:reduce){#routeLine,.pulse,.live i{animation:none}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="mono-badge" aria-hidden="true">FBC</div>
+      <div>
+        <h1>Campus Wayfinder</h1>
+        <p>Fellowship Baptist College · Kabankalan City · Kiosk at the Lobby Entrance</p>
+      </div>
+    </div>
+    <div class="status">
+      <div class="live"><i id="liveDot"></i><span id="liveTxt">Connecting…</span></div>
+      <button id="themeBtn" class="themebtn" type="button">Light mode</button>
+      <div class="clock"><b id="time">--:--</b><span id="date"></span></div>
+    </div>
+  </header>
+
+  <section class="kpis" aria-label="Kiosk summary">
+    <div class="kpi"><small>Places on the map</small><b id="k1">0</b><span id="k1s"></span></div>
+    <div class="kpi"><small>Offices open now</small><b id="k2">0</b><span id="k2s">sample office hours</span></div>
+    <div class="kpi"><small>Farthest walk</small><b id="k3">0</b><span id="k3s"></span></div>
+    <div class="kpi"><small>Routes today</small><b id="k4">0</b><span id="k4s">all kiosks</span></div>
+  </section>
+
+  <div class="grid">
+    <div class="mapcard">
+      <div class="maphead">
+        <h2>Campus map</h2>
+        <div class="legend" id="legend"></div>
+      </div>
+      <svg id="map" viewBox="0 0 1920 1920" role="img" aria-label="Campus map. The kiosk is at the Lobby at the bottom."></svg>
+    </div>
+
+    <div class="side">
+      <div class="panel">
+        <div class="searchrow">
+          <input id="q" class="search" type="search" placeholder="Where do you want to go?" autocomplete="off" aria-label="Search for a place">
+        </div>
+        <div class="lbl">Quick picks</div>
+        <div class="picks" id="picks"></div>
+      </div>
+
+      <div class="panel result" id="result" aria-live="polite"></div>
+
+      <div class="panel">
+        <div class="filters" id="filters"></div>
+        <div class="dir" id="dir" role="list"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span><b>Fellowship Baptist College</b> · Rizal Street, Barangay 9, Kabankalan City</span>
+    <span style="font-family:var(--mono)">9.98603° N, 122.81808° E</span>
+    <a href="https://www.google.com/maps/search/?api=1&query=9.98603,122.81808" target="_blank" rel="noopener">Google Maps ↗</a>
+    <label class="start" for="start">Kiosk location <select id="start"></select></label>
+    <span>Distances are estimates. Office hours are sample data.</span>
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* ===== DATA (coordinates traced from the group's campus sketch, 1920×1920, original orientation) ===== */
+const M_PER_UNIT = 0.08, WALK_MPS = 1.2;
+const CATS = {
+  office:  {label:"Offices",     c:"--c-office"},
+  dept:    {label:"Departments", c:"--c-dept"},
+  class:   {label:"Classrooms",  c:"--c-class"},
+  facility:{label:"Facilities",  c:"--c-facility"},
+  pending: {label:"Not on map yet", c:"--c-pending"}
+};
+const MEM = "Dr. Demetrio Macasa, Sr. Memorial Building", MAC = "Macasa Building", SCI = "Science Building", TRB = "TR classrooms";
+// side = which edge the door is on (original sketch), acc = walkway line the door opens onto
+const P = (id,name,short,cat,bldg,rect,side,acc,desc,hours) => ({id,name,short,cat,bldg,rect,side,acc,desc,hours});
+const OFFICE = "office";
+const PLACES = [
+  P("registrar","Registrar","Registrar","office",MEM,[293,162,144,131],"b",315,"Enrollment, student records, TOR and certificate requests.",OFFICE),
+  P("hr","HR Office","HR","office",MEM,[437,162,143,131],"b",315,"Human Resources for faculty and staff.",OFFICE),
+  P("cashier","Cashier","Cashier","office",MEM,[580,162,144,131],"b",315,"Tuition and fee payments, official receipts.",OFFICE),
+  P("lobby","Lobby (Entrance)","Lobby","facility",MEM,[724,162,482,131],"b",315,"Main entrance and waiting area. The kiosk is here."),
+  P("idroom","ID Room","ID Room","office",MEM,[1206,162,143,131],"b",315,"Student ID photo capture, printing and replacement.",OFFICE),
+  P("ahcdept","AHC Department","AHC Dept","dept",MEM,[1349,162,258,131],"b",315,"AHC Department office."),
+  P("pr2","PR 2","PR 2","class",MAC,[35,337,104,110],"r",190,"Room PR 2, Macasa Building."),
+  P("pr1","PR 1","PR 1","class",MAC,[35,447,104,110],"r",190,"Room PR 1, Macasa Building."),
+  P("mh5","MH 5","MH 5","class",MAC,[35,670,103,110],"r",190,"Room MH 5, Macasa Building."),
+  P("mh6","MH 6","MH 6","class",MAC,[35,780,103,110],"r",190,"Room MH 6, Macasa Building."),
+  P("terminal","Terminal","Terminal","facility","Terminal",[228,403,144,425],"r",400,"Terminal area beside the Macasa Building."),
+  P("ahcfac","AHC Faculty","AHC Faculty","dept",SCI,[1406,337,245,192],"l",1385,"AHC faculty room, Science Building."),
+  P("sb101","SB 101","SB 101","class",SCI,[1406,529,245,155],"l",1385,"Room SB 101, Science Building."),
+  P("sb102","SB 102","SB 102","class",SCI,[1406,684,245,139],"l",1385,"Room SB 102, Science Building."),
+  P("sb103","SB 103","SB 103","class",SCI,[1406,823,245,141],"l",1385,"Room SB 103, Science Building."),
+  P("sb104","SB 104","SB 104","class",SCI,[1406,964,245,141],"l",1385,"Room SB 104, Science Building."),
+  P("osas","OSAS","OSAS","office",SCI,[1406,1105,245,140],"l",1385,"Office of Student Affairs and Services.",OFFICE),
+  P("clinic","Clinic","Clinic","facility",SCI,[1406,1245,245,140],"l",1385,"School clinic: first aid and medical clearance.",OFFICE),
+  P("tr4","TR 4","TR 4","class",TRB,[823,893,162,84],"r",1010,"Classroom TR 4."),
+  P("tr3","TR 3","TR 3","class",TRB,[823,977,162,86],"r",1010,"Classroom TR 3."),
+  P("tr2","TR 2","TR 2","class",TRB,[823,1063,162,87],"r",1010,"Classroom TR 2."),
+  P("tr1","TR 1","TR 1","class",TRB,[823,1150,162,86],"r",1010,"Classroom TR 1."),
+  P("tr6","TR 6","TR 6","class",TRB,[762,1281,224,104],"t",1260,"Classroom TR 6."),
+  P("tr5","TR 5","TR 5","class",TRB,[986,1281,224,104],"t",1260,"Classroom TR 5."),
+  P("tr7","TR 7","TR 7","class",TRB,[846,1388,223,103],"l",740,"Classroom TR 7."),
+  P("tr8","TR 8","TR 8","class",TRB,[846,1491,223,103],"l",740,"Classroom TR 8."),
+  P("tr9","TR 9","TR 9","class",TRB,[846,1594,223,103],"l",740,"Classroom TR 9."),
+  P("tr10","TR 10","TR 10","class",TRB,[846,1697,223,103],"l",740,"Classroom TR 10."),
+  P("tr11","TR 11","TR 11","class",TRB,[846,1800,223,107],"l",740,"Classroom TR 11."),
+  P("tr12","TR 12","TR 12","class",TRB,[416,1494,222,104],"r",740,"Classroom TR 12."),
+  P("tr13","TR 13","TR 13","class",TRB,[416,1598,222,104],"r",740,"Classroom TR 13."),
+  P("tr14","TR 14","TR 14","class",TRB,[416,1702,222,108],"r",740,"Classroom TR 14."),
+  P("gym","Gymnasium","Gymnasium","facility","Gymnasium",[1228,1470,426,397],"t",1440,"Assemblies, PE classes and sports events."),
+];
+const PENDING = ["Assessment","Library","CECS Department","CCJE Department","CTEAS Department","CHBA Department","MMIT","Comlab 1","Comlab 2","Comlab 3"]
+  .map(n=>({id:n.toLowerCase().replace(/[^a-z0-9]/g,""),name:n,cat:"pending",bldg:"Location to be added",desc:"This place isn't pinned on the map yet. Ask at the Lobby information desk."}));
+// Walkways (original sketch coordinates)
+const WALKS = [
+  ["the Lobby Walk",[190,315],[1500,315]],
+  ["the Macasa Walk",[190,315],[190,900]],
+  ["the Terminal Walk",[400,315],[400,1260]],
+  ["the Center Walk",[1010,315],[1010,1260]],
+  ["the Cross Walk",[400,1260],[1385,1260]],
+  ["the Science Walk",[1385,315],[1385,1440]],
+  ["the Gym Path",[1385,1440],[1441,1440]],
+  ["the TR Walk",[740,1260],[740,1860]],
+];
+
+/* ===== rotate 180° so the Lobby kiosk is at the bottom ===== */
+const N = 1920, rp = ([x,y]) => [N-x, N-y];
+const rr = ([x,y,w,h]) => [N-x-w, N-y-h, w, h];
+PLACES.forEach(p=>{
+  const [x,y,w,h]=p.rect; let door;
+  if(p.side==="b")door=[Math.round(x+w/2),y+h]; if(p.side==="t")door=[Math.round(x+w/2),y];
+  if(p.side==="l")door=[x,Math.round(y+h/2)];   if(p.side==="r")door=[x+w,Math.round(y+h/2)];
+  const access = (p.side==="b"||p.side==="t") ? [door[0],p.acc] : [p.acc,door[1]];
+  p.door=rp(door); p.access=rp(access); p.r=rr(p.rect);
+});
+{const L=PLACES.find(p=>p.id==="lobby");L.door=rp([1010,293]);L.access=rp([1010,315]);} // lobby doors line up with the Center Walk
+const WK = WALKS.map(([name,a,b])=>({name,a:rp(a),b:rp(b)}));
+const ALL = [...PLACES,...PENDING];
+const byId = Object.fromEntries(ALL.map(p=>[p.id,p]));
+
+/* ===== walkway graph + shortest path ===== */
+const key=p=>p[0]+","+p[1];
+const onSeg=(p,w)=>{const[x1,y1]=w.a,[x2,y2]=w.b;return(x1===x2&&p[0]===x1&&p[1]>=Math.min(y1,y2)&&p[1]<=Math.max(y1,y2))||(y1===y2&&p[1]===y1&&p[0]>=Math.min(x1,x2)&&p[0]<=Math.max(x1,x2));};
+const G={};
+const link=(a,b,name)=>{const d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(!d)return;(G[key(a)]??=[]).push({to:b,d,name});(G[key(b)]??=[]).push({to:a,d,name});};
+const nodes=[...WK.flatMap(w=>[w.a,w.b]),...PLACES.map(p=>p.access)];
+WK.forEach(w=>{const on=nodes.filter(p=>onSeg(p,w)).sort((p,q)=>(p[0]-q[0])||(p[1]-q[1]));const u=on.filter((p,i)=>!i||key(p)!==key(on[i-1]));for(let i=1;i<u.length;i++)link(u[i-1],u[i],w.name);});
+function shortest(s,t){
+  const dist={[key(s)]:0},prev={},pt={[key(s)]:s},done=new Set();
+  for(;;){let u=null,b=Infinity;for(const k in dist)if(!done.has(k)&&dist[k]<b){b=dist[k];u=k;}
+    if(u===null)return null;if(u===key(t))break;done.add(u);
+    for(const e of G[u]||[]){const k=key(e.to),nd=dist[u]+e.d;if(nd<(dist[k]??Infinity)){dist[k]=nd;prev[k]={from:u,name:e.name};pt[k]=e.to;}}}
+  const out=[];let k=key(t);while(k!==key(s)){out.unshift({p:pt[k],name:prev[k].name});k=prev[k].from;}
+  return[{p:s},...out];
+}
+const dirOf=(a,b)=>[Math.sign(b[0]-a[0]),Math.sign(b[1]-a[1])];
+const cross=(a,b)=>a[0]*b[1]-a[1]*b[0];
+function route(from,to){
+  if(from.id===to.id)return{pts:[from.door],steps:[["You are already here",0]],meters:0};
+  const core=shortest(from.access,to.access);if(!core)return null;
+  const legs=[];
+  if(key(from.door)!==key(from.access))legs.push({name:"exit",a:from.door,b:from.access});
+  for(let i=1;i<core.length;i++)legs.push({name:core[i].name,a:core[i-1].p,b:core[i].p});
+  legs.push({name:"enter",a:to.access,b:to.door});
+  const L=[];for(const l of legs){const m=L[L.length-1];if(m&&m.name===l.name&&!["exit","enter"].includes(l.name))m.b=l.b;else L.push({...l});}
+  const len=l=>Math.hypot(l.b[0]-l.a[0],l.b[1]-l.a[1])*M_PER_UNIT;
+  const rel=d=>d[1]<0?"straight ahead":d[1]>0?"back":d[0]<0?"to your left":"to your right"; // relative to the kiosk screen (up = forward)
+  const steps=[];let meters=0;
+  L.forEach((l,i)=>{
+    const m=Math.round(len(l));meters+=len(l);const d=dirOf(l.a,l.b),pv=L[i-1];
+    if(l.name==="exit"){steps.push([from.id==="lobby"?"Walk out of the Lobby into the campus":`Step out of ${from.name}`,m]);return;}
+    if(l.name==="enter"){let s="";if(pv){const c=cross(dirOf(pv.a,pv.b),d);s=c>0?" on your right":c<0?" on your left":" straight ahead";}steps.push([`Arrive at ${to.name}${s}`,m]);return;}
+    let t;
+    if(!pv)t=`Go ${rel(d)} along ${l.name}`;
+    else{const c=cross(dirOf(pv.a,pv.b),d);t=c>0?`Turn right onto ${l.name}`:c<0?`Turn left onto ${l.name}`:`Continue on ${l.name}`;}
+    steps.push([t,m]);
+  });
+  return{pts:[from.door,...core.map(c=>c.p),to.door],steps,meters:Math.round(meters)};
+}
+const fmtMin=m=>{const s=m/WALK_MPS;return s<60?"<1":Math.round(s/60).toString();};
+
+/* ===== office hours (from Supabase; defaults until loaded) ===== */
+const DEFAULT_HRS={wo:8,wc:17,so:8,sc:12};
+const fmtH=h=>{if(h==null)return"";const hh=Math.floor(h),mm=Math.round((h-hh)*60);if(hh===12&&mm===0)return"12:00 NN";const ap=hh>=12?"PM":"AM",h12=((hh+11)%12)+1;return`${h12}:${String(mm).padStart(2,"0")} ${ap}`;};
+function officeStatus(now,p){
+  const H=(p&&p.hrs)||DEFAULT_HRS;
+  const d=now.getDay(),h=now.getHours()+now.getMinutes()/60;
+  const weekday=d>=1&&d<=5, sat=d===6;
+  const o=weekday?H.wo:sat?H.so:null, c=weekday?H.wc:sat?H.sc:null;
+  if(o!=null&&c!=null&&h>=o&&h<c)return{open:true,txt:`Open · closes ${fmtH(c)}`};
+  if(o!=null&&h<o)return{open:false,txt:`Closed · opens ${fmtH(o)}`};
+  const next=(d>=1&&d<=4&&H.wo!=null)?`tomorrow ${fmtH(H.wo)}`:(d===5&&H.so!=null)?`Saturday ${fmtH(H.so)}`:`Monday ${fmtH(H.wo??8)}`;
+  return{open:false,txt:`Closed · opens ${next}`};
+}
+
+/* ===== draw map ===== */
+const svg=document.getElementById("map"),NS="http://www.w3.org/2000/svg";
+const el=(t,a,p=svg)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);p.appendChild(e);return e;};
+const V=v=>`var(${v})`;
+// field
+const F=rr([400,315,985,945]);
+el("rect",{x:F[0]-40,y:F[1]-40,width:F[2]+80,height:F[3]+80,rx:40,fill:V("--lawn")});
+for(let gx=F[0];gx<=F[0]+F[2];gx+=82)el("line",{x1:gx,y1:F[1]-30,x2:gx,y2:F[1]+F[3]+30,stroke:V("--lawn-line"),"stroke-width":2});
+const ft=el("text",{x:F[0]+F[2]/2,y:F[1]+F[3]*0.62,"text-anchor":"middle",style:"font-family:var(--display);font-weight:800;font-size:150px;letter-spacing:.12em;fill:var(--lawn-line)"});ft.textContent="FIELD";
+// walkways
+WK.forEach(w=>el("line",{x1:w.a[0],y1:w.a[1],x2:w.b[0],y2:w.b[1],stroke:V("--walk"),"stroke-width":30,"stroke-linecap":"round"}));
+// building nameplates & labels
+const mp=rr([725,62,481,98]);
+el("rect",{x:mp[0],y:mp[1],width:mp[2],height:mp[3],rx:8,fill:V("--panel-2"),stroke:V("--room-stroke"),"stroke-width":3});
+[["DR. DEMETRIO MACASA, SR.",mp[1]+42],["MEMORIAL BUILDING",mp[1]+80]].forEach(([t,y])=>{const e=el("text",{x:mp[0]+mp[2]/2,y,"text-anchor":"middle",class:"bl",style:"fill:var(--fg);font-size:32px;letter-spacing:.08em"});e.textContent=t;});
+const vlab=(t,x,y,deg)=>{const e=el("text",{x,y,"text-anchor":"middle",class:"bl",transform:`rotate(${deg} ${x} ${y})`});e.textContent=t;};
+vlab("Macasa Building",N-165,N-660,90);
+vlab("Science Building",N-1700,N-870,-90);
+// rooms
+const roomEls={};
+PLACES.forEach(p=>{
+  const g=el("g",{class:"room",tabindex:0,role:"button","aria-label":p.name});
+  const[x,y,w,h]=p.r;
+  el("rect",{class:"box",x,y,width:w,height:h,rx:6},g);
+  el("rect",{x:x+10,y:y+10,width:14,height:14,rx:3,fill:V(CATS[p.cat].c)},g);
+  const label=p.short.toUpperCase(),vertical=h>w*1.8;
+  let fs=Math.min(p.id==="gym"?72:40,(vertical?h:w)*0.9/(label.length*0.52));
+  const t=el("text",{x:x+w/2,y:y+h/2+fs*0.35,"text-anchor":"middle",class:"rl","font-size":fs},g);
+  if(vertical)t.setAttribute("transform",`rotate(90 ${x+w/2} ${y+h/2})`);
+  t.textContent=label;
+  el("line",{x1:p.door[0],y1:p.door[1],x2:p.access[0],y2:p.access[1],stroke:V("--walk"),"stroke-width":12},g);
+  g.addEventListener("click",()=>select(p.id));
+  g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();select(p.id);}});
+  roomEls[p.id]=g;
+});
+// route layer
+const rg=el("g",{});
+const glow=el("polyline",{id:"routeGlow",points:""},rg),line=el("polyline",{id:"routeLine",points:""},rg);
+const destG=el("g",{},rg);el("circle",{r:26,fill:V("--route"),class:"pulse"},destG);el("circle",{r:20,fill:V("--route"),stroke:V("--bg"),"stroke-width":6},destG);
+const walker=el("circle",{r:15,fill:"#ffffff",stroke:V("--route"),"stroke-width":6},rg);
+const hereG=el("g",{});
+el("circle",{r:30,fill:V("--here"),class:"pulse"},hereG);
+el("circle",{r:24,fill:V("--here"),stroke:"#ffffff","stroke-width":6},hereG);
+const hereTag=el("g",{},hereG);
+el("rect",{x:-120,y:44,width:240,height:52,rx:26,fill:V("--here")},hereTag);
+const ht=el("text",{x:0,y:80,"text-anchor":"middle",style:"font-family:var(--display);font-weight:800;font-size:32px;fill:#fff;letter-spacing:.06em"},hereTag);ht.textContent="YOU ARE HERE";
+
+/* ===== UI ===== */
+const $=id=>document.getElementById(id);
+document.getElementById("legend").innerHTML=Object.entries(CATS).filter(([k])=>k!=="pending").map(([k,c])=>`<span><i class="sw" style="background:var(${c.c})"></i>${c.label}</span>`).join("")+`<span><i class="sw" style="background:var(--here);border-radius:50%"></i>Kiosk</span>`;
+const startSel=$("start");
+startSel.innerHTML=PLACES.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+let startId="lobby";try{const s=localStorage.getItem("fbc-kiosk");if(s&&byId[s]&&byId[s].door)startId=s;}catch(e){}
+startSel.value=startId;
+startSel.addEventListener("change",()=>{startId=startSel.value;try{localStorage.setItem("fbc-kiosk",startId);}catch(e){}refreshAll();});
+let current=null,filter="all",routesShown=0;
+
+const PICKS=["registrar","cashier","clinic","osas","gym","idroom"];
+function renderPicks(){
+  $("picks").innerHTML=PICKS.map(id=>{const p=byId[id],r=route(byId[startId],p);return`<button class="pick" data-id="${id}"><b>${p.short}</b><span>${r?fmtMin(r.meters)+" min walk":""}</span></button>`;}).join("");
+}
+$("picks").addEventListener("click",e=>{const b=e.target.closest(".pick");if(b)select(b.dataset.id);});
+
+$("filters").innerHTML=[["all","All"],...Object.entries(CATS).map(([k,c])=>[k,c.label])].map(([k,l])=>`<button class="chip" data-k="${k}" aria-pressed="${k==="all"}">${l}</button>`).join("");
+$("filters").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;filter=b.dataset.k;$("filters").querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed",c===b));renderDir();});
+$("q").addEventListener("input",()=>{renderDir();const s=$("q").value.trim().toLowerCase();Object.entries(roomEls).forEach(([id,g])=>g.classList.toggle("dim",!!s&&!(byId[id].name+" "+byId[id].bldg).toLowerCase().includes(s)));});
+$("q").addEventListener("keydown",e=>{if(e.key==="Enter"){const f=$("dir").querySelector(".it");if(f)select(f.dataset.id);}});
+function renderDir(){
+  const s=$("q").value.trim().toLowerCase();let html="";
+  for(const[k,c]of Object.entries(CATS)){
+    if(filter!=="all"&&filter!==k)continue;
+    const items=ALL.filter(p=>p.cat===k&&(!s||(p.name+" "+p.bldg).toLowerCase().includes(s)));
+    if(!items.length)continue;
+    html+=`<div class="grp">${c.label}</div>`+items.map(p=>{const r=p.door?route(byId[startId],p):null;
+      return`<button class="it" role="listitem" data-id="${p.id}" aria-current="${p.id===current}"><i class="sw" style="background:var(${c.c})"></i><span>${p.name}<small>${p.bldg}</small></span><em>${r?fmtMin(r.meters)+" min":"—"}</em></button>`;}).join("");
+  }
+  $("dir").innerHTML=html||`<p class="hint">Nothing matches “${$("q").value}”. Try a room code like “TR 7” or an office name.</p>`;
+}
+$("dir").addEventListener("click",e=>{const b=e.target.closest(".it");if(b)select(b.dataset.id);});
+
+function select(id){current=id;if(byId[id].door){routesShown+=1;$("k4").textContent=routesShown;logSearch(id);}renderDir();draw();}
+
+let anim=null;
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+function animateWalker(pts){
+  cancelAnimationFrame(anim);walker.style.display=reduce?"none":"";
+  if(reduce)return;
+  const seg=[];let total=0;for(let i=1;i<pts.length;i++){const d=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);seg.push(d);total+=d;}
+  const dur=Math.min(4200,Math.max(1600,total*1.6));let t0=null;
+  const step=ts=>{t0??=ts;let f=((ts-t0)%(dur+900))/dur;if(f>1)f=1;let d=f*total,i=0;while(i<seg.length-1&&d>seg[i]){d-=seg[i];i++;}
+    const a=pts[i],b=pts[i+1],k=seg[i]?d/seg[i]:0;walker.setAttribute("cx",a[0]+(b[0]-a[0])*k);walker.setAttribute("cy",a[1]+(b[1]-a[1])*k);anim=requestAnimationFrame(step);};
+  anim=requestAnimationFrame(step);
+}
+
+function draw(){
+  const from=byId[startId];
+  hereG.setAttribute("transform",`translate(${from.door[0]},${from.door[1]})`);
+  hereTag.setAttribute("transform",from.door[1]>N-260?"translate(0,-150)":"");
+  Object.entries(roomEls).forEach(([id,g])=>{g.classList.toggle("dest",id===current);g.classList.toggle("from",id===startId);});
+  const to=current&&byId[current];
+  if(!to||!to.door){glow.setAttribute("points","");line.setAttribute("points","");destG.style.display="none";walker.style.display="none";cancelAnimationFrame(anim);}
+  if(!to){
+    $("result").innerHTML=`<div class="lbl" style="margin-top:0">Welcome</div><h3>Where are you headed?</h3><p class="hint">Tap a room on the map, pick a quick destination, or search. The amber line shows your walking route from the kiosk.</p>`;return;}
+  const c=CATS[to.cat];
+  const st=to.hours?officeStatus(new Date(),to):null;
+  const chips=`<div class="chiprow"><span class="tag"><i style="background:var(${c.c})"></i>${c.label.replace(/s$/,"")}</span><span class="tag">${to.bldg}</span>${st?`<span class="tag"><i style="background:var(${st.open?"--ok":"--closed"})"></i>${st.txt}</span>`:""}</div>`;
+  if(!to.door){
+    $("result").innerHTML=`<div class="lbl" style="margin-top:0">Destination</div><h3>${to.name}</h3>${chips}<p class="hint" style="margin-top:12px">${to.desc}</p>`;return;}
+  const r=route(from,to);
+  glow.setAttribute("points",r.pts.map(p=>p.join(",")).join(" "));line.setAttribute("points",glow.getAttribute("points"));
+  destG.style.display="";destG.setAttribute("transform",`translate(${to.door[0]},${to.door[1]})`);
+  animateWalker(r.pts);
+  $("result").innerHTML=`<div class="lbl" style="margin-top:0">Destination</div><h3>${to.name}</h3>${chips}
+    <div class="eta"><div><b>${fmtMin(r.meters)}</b><span>min walk</span></div><div><b>${r.meters}</b><span>meters</span></div><div><b>${r.steps.length}</b><span>steps</span></div></div>
+    <p class="hint" style="margin:0 0 8px">${to.desc}</p>
+    <ol class="steps">${r.steps.map(([t,m])=>`<li><span>${t}</span><em>${m?m+" m":""}</em></li>`).join("")}</ol>`;
+}
+
+function refreshAll(){
+  const from=byId[startId];
+  $("k1").textContent=PLACES.length;$("k1s").textContent=`${PENDING.length} more to be pinned`;
+  let far=null;PLACES.forEach(p=>{const r=route(from,p);if(r&&(!far||r.meters>far.m))far={m:r.meters,p};});
+  $("k3").textContent=fmtMin(far.m)+" min";$("k3s").textContent=`to ${far.p.name}, ${far.m} m`;
+  renderPicks();renderDir();draw();
+}
+function tick(){
+  const now=new Date();
+  $("time").textContent=now.toLocaleTimeString("en-PH",{hour:"numeric",minute:"2-digit"});
+  $("date").textContent=now.toLocaleDateString("en-PH",{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+  const offices=PLACES.filter(p=>p.hours);$("k2").textContent=`${offices.filter(p=>officeStatus(now,p).open).length}/${offices.length}`;
+}
+// idle reset, like a real kiosk
+let idle;const resetIdle=()=>{clearTimeout(idle);idle=setTimeout(()=>{if(current){current=null;$("q").value="";Object.values(roomEls).forEach(g=>g.classList.remove("dim"));renderDir();draw();}},90000);};
+["pointerdown","keydown"].forEach(e=>addEventListener(e,resetIdle));resetIdle();
+
+// light / dark toggle
+const root=document.documentElement,themeBtn=$("themeBtn");
+const isLight=()=>root.dataset.theme?root.dataset.theme==="light":matchMedia("(prefers-color-scheme: light)").matches;
+const paintBtn=()=>{themeBtn.textContent=isLight()?"☾ Dark mode":"☀ Light mode";};
+try{const t=localStorage.getItem("fbc-theme");if(t)root.dataset.theme=t;}catch(e){}
+themeBtn.addEventListener("click",()=>{const t=isLight()?"dark":"light";root.dataset.theme=t;try{localStorage.setItem("fbc-theme",t);}catch(e){}paintBtn();});
+matchMedia("(prefers-color-scheme: light)").addEventListener("change",paintBtn);
+new MutationObserver(paintBtn).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+paintBtn();
+const h=location.hash.slice(1);if(byId[h])current=h;
+tick();setInterval(tick,15000);refreshAll();
+
+/* ===== Supabase: live directory + search log ===== */
+let sb=null;
+const setLive=(ok,txt)=>{$("liveTxt").textContent=txt;$("liveDot").style.background=ok?"var(--ok)":"var(--closed)";};
+const toH=t=>{if(!t)return null;const[a,b]=t.split(":");return+a+(+b)/60;};
+async function connect(){
+  try{
+    const cfg=await fetch("/api/config").then(r=>{if(!r.ok)throw new Error("config "+r.status);return r.json();});
+    if(!cfg.url||!cfg.anonKey)throw new Error("missing config");
+    sb=window.supabase.createClient(cfg.url,cfg.anonKey);
+    const{data,error}=await sb.from("wf_places").select("*").order("sort_order");
+    if(error)throw error;
+    data.forEach(r=>{
+      let p=byId[r.id];
+      if(!p){p={id:r.id,cat:"pending"};PENDING.push(p);ALL.push(p);byId[r.id]=p;}
+      p.name=r.name;if(r.short_label)p.short=r.short_label;if(r.building)p.bldg=r.building;if(r.description)p.desc=r.description;
+      if(!p.door)p.cat="pending"; else if(r.category&&r.category!=="pending")p.cat=r.category;
+      p.hours=r.weekday_open||r.saturday_open?"office":undefined;
+      p.hrs={wo:toH(r.weekday_open),wc:toH(r.weekday_close),so:toH(r.saturday_open),sc:toH(r.saturday_close)};
+    });
+    const day=new Date();day.setHours(0,0,0,0);
+    const{count}=await sb.from("wf_search_logs").select("id",{count:"exact",head:true}).gte("created_at",day.toISOString());
+    routesShown=count||0;$("k4").textContent=routesShown;
+    setLive(true,"Live · Supabase");
+    tick();refreshAll();
+  }catch(e){console.warn("Supabase unavailable, using built-in data",e);setLive(false,"Offline data");$("k4s").textContent="this session";}
+}
+async function logSearch(id){if(!sb)return;try{await sb.from("wf_search_logs").insert({place_id:id,kiosk:startId});}catch(e){}}
+connect();
+</script>
